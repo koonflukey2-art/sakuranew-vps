@@ -24,13 +24,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
   Loader2,
   Save,
   Clock,
@@ -47,7 +40,6 @@ import {
   RefreshCw,
   Eye,
   EyeOff,
-  Receipt,
   Sparkles,
   FileText,
 } from "lucide-react";
@@ -60,17 +52,21 @@ interface SystemSettings {
   organizationId?: string;
   dailyCutOffHour: number;
   dailyCutOffMinute: number;
+
+  // Stock LINE
   lineNotifyToken: string;
   lineChannelAccessToken: string;
   lineChannelSecret: string;
   lineWebhookUrl: string;
+  lineTargetId?: string;
 
-  // ✅ Ads
+  // Ads LINE
   adsLineNotifyToken?: string;
   adsLineChannelAccessToken?: string;
   adsLineChannelSecret?: string;
   adsLineWebhookUrl?: string;
 
+  // notify/admin
   adminEmails: string;
   notifyOnOrder: boolean;
   notifyOnLowStock: boolean;
@@ -111,6 +107,7 @@ interface AdAccount {
 export default function SystemSettingsPage() {
   const router = useRouter();
   const { toast } = useToast();
+
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -119,17 +116,21 @@ export default function SystemSettingsPage() {
   const [settings, setSettings] = useState<SystemSettings>({
     dailyCutOffHour: 23,
     dailyCutOffMinute: 59,
+
+    // Stock LINE
     lineNotifyToken: "",
     lineChannelAccessToken: "",
     lineChannelSecret: "",
     lineWebhookUrl: "",
+    lineTargetId: "",
 
-    // ✅ Ads initial
+    // Ads LINE
     adsLineNotifyToken: "",
     adsLineChannelAccessToken: "",
     adsLineChannelSecret: "",
     adsLineWebhookUrl: "",
 
+    // notify/admin
     adminEmails: "",
     notifyOnOrder: true,
     notifyOnLowStock: true,
@@ -174,7 +175,6 @@ export default function SystemSettingsPage() {
   const [adAccounts, setAdAccounts] = useState<AdAccount[]>([]);
   const [loadingAdAccounts, setLoadingAdAccounts] = useState(true);
   const [testingAdAccount, setTestingAdAccount] = useState<string | null>(null);
-  const [isAdAccountDialogOpen, setIsAdAccountDialogOpen] = useState(false);
   const [adAccountForm, setAdAccountForm] = useState({
     platform: "FACEBOOK",
     accountName: "",
@@ -191,7 +191,7 @@ export default function SystemSettingsPage() {
       ? `${window.location.origin}/api/line/webhook`
       : settings.lineWebhookUrl || "https://your-domain.com/api/line/webhook";
 
-  // ✅ Auto-generate webhook URL (Ads)
+  // Auto-generate webhook URL (Ads)
   const adsWebhookUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}/api/webhooks/line-ads`
@@ -220,6 +220,7 @@ export default function SystemSettingsPage() {
         }
 
         setIsAuthorized(true);
+
         // Fetch all settings
         fetchSettings();
         fetchProviders();
@@ -241,9 +242,7 @@ export default function SystemSettingsPage() {
     try {
       setLoading(true);
       const res = await fetch("/api/system-settings");
-      if (!res.ok) {
-        throw new Error("Failed to fetch settings");
-      }
+      if (!res.ok) throw new Error("Failed to fetch settings");
 
       const data = await res.json();
 
@@ -264,7 +263,10 @@ export default function SystemSettingsPage() {
           : data.lineChannelSecret || "",
         lineWebhookUrl: data.lineWebhookUrl || webhookUrl,
 
-        // ✅ Ads LINE (IMPORTANT)
+        // ✅ FIX: ใช้ค่าจาก server (data) ไม่ใช่ state เก่า
+        lineTargetId: data.lineTargetId || "",
+
+        // Ads LINE
         adsLineNotifyToken: data.adsLineNotifyToken?.includes("...")
           ? ""
           : data.adsLineNotifyToken || "",
@@ -276,6 +278,7 @@ export default function SystemSettingsPage() {
           : data.adsLineChannelSecret || "",
         adsLineWebhookUrl: data.adsLineWebhookUrl || adsWebhookUrl,
 
+        // notify/admin
         adminEmails: data.adminEmails || "",
         notifyOnOrder: data.notifyOnOrder ?? true,
         notifyOnLowStock: data.notifyOnLowStock ?? true,
@@ -304,10 +307,12 @@ export default function SystemSettingsPage() {
 
         // Stock webhook
         lineWebhookUrl: webhookUrl,
+        lineTargetId: settings.lineTargetId || "",
 
-        // ✅ Ads webhook
+        // Ads webhook
         adsLineWebhookUrl: adsWebhookUrl,
 
+        // notify/admin
         adminEmails: settings.adminEmails,
         notifyOnOrder: settings.notifyOnOrder,
         notifyOnLowStock: settings.notifyOnLowStock,
@@ -325,7 +330,7 @@ export default function SystemSettingsPage() {
         payload.lineChannelSecret = settings.lineChannelSecret.trim();
       }
 
-      // ✅ Ads LINE tokens
+      // Ads LINE tokens
       if ((settings.adsLineNotifyToken || "").trim()) {
         payload.adsLineNotifyToken = (settings.adsLineNotifyToken || "").trim();
       }
@@ -348,9 +353,7 @@ export default function SystemSettingsPage() {
 
       const data = await res.json();
 
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to save settings");
-      }
+      if (!res.ok) throw new Error(data.error || "Failed to save settings");
 
       // อัปเดต state ด้วยค่าที่มาจากเซิร์ฟเวอร์ทันที (แสดงค่าที่บันทึกแล้ว)
       setSettings((prev) => ({
@@ -360,6 +363,9 @@ export default function SystemSettingsPage() {
 
         lineWebhookUrl: data.lineWebhookUrl || webhookUrl,
         adsLineWebhookUrl: data.adsLineWebhookUrl || adsWebhookUrl,
+
+        // ✅ sync lineTargetId ที่ server ส่งกลับมาด้วย
+        lineTargetId: data.lineTargetId ?? prev.lineTargetId,
 
         adminEmails: data.adminEmails ?? "",
         notifyOnOrder:
@@ -381,7 +387,7 @@ export default function SystemSettingsPage() {
         lineChannelAccessToken: "",
         lineChannelSecret: "",
 
-        // ✅ เคลียร์ Ads tokens ด้วย
+        // เคลียร์ Ads tokens ด้วย
         adsLineNotifyToken: "",
         adsLineChannelAccessToken: "",
         adsLineChannelSecret: "",
@@ -407,10 +413,7 @@ export default function SystemSettingsPage() {
   const fetchProviders = async () => {
     try {
       const response = await fetch("/api/ai-settings");
-
-      if (!response.ok) {
-        throw new Error("Failed to load providers");
-      }
+      if (!response.ok) throw new Error("Failed to load providers");
 
       const data = await response.json();
 
@@ -429,10 +432,7 @@ export default function SystemSettingsPage() {
 
   const handleSaveAI = async () => {
     if (!apiKey.trim()) {
-      toast({
-        title: "กรุณากรอก API Key",
-        variant: "destructive",
-      });
+      toast({ title: "กรุณากรอก API Key", variant: "destructive" });
       return;
     }
 
@@ -567,9 +567,7 @@ export default function SystemSettingsPage() {
 
       const data = await res.json();
 
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to save credential");
-      }
+      if (!res.ok) throw new Error(data.error || "Failed to save credential");
 
       toast({
         title: "✅ บันทึกสำเร็จ",
@@ -605,18 +603,11 @@ export default function SystemSettingsPage() {
 
       const data = await res.json();
 
-      if (data.success) {
-        toast({
-          title: "✅ เชื่อมต่อสำเร็จ",
-          description: data.message,
-        });
-      } else {
-        toast({
-          title: "❌ เชื่อมต่อไม่สำเร็จ",
-          description: data.message,
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: data.success ? "✅ เชื่อมต่อสำเร็จ" : "❌ เชื่อมต่อไม่สำเร็จ",
+        description: data.message,
+        variant: data.success ? "default" : "destructive",
+      });
 
       fetchPlatformCreds();
     } catch (error) {
@@ -680,48 +671,6 @@ export default function SystemSettingsPage() {
     }
   };
 
-  const handleAddAdAccount = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    try {
-      const res = await fetch("/api/ad-accounts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(adAccountForm),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to add ad account");
-      }
-
-      toast({
-        title: "✅ เพิ่มสำเร็จ",
-        description: "เพิ่ม Ad Account เรียบร้อยแล้ว",
-      });
-
-      setIsAdAccountDialogOpen(false);
-      setAdAccountForm({
-        platform: "FACEBOOK",
-        accountName: "",
-        accountId: "",
-        apiKey: "",
-        apiSecret: "",
-        accessToken: "",
-        refreshToken: "",
-      });
-
-      fetchAdAccounts();
-    } catch (error: any) {
-      toast({
-        title: "ผิดพลาด",
-        description: error.message || "ไม่สามารถเพิ่ม Ad Account ได้",
-        variant: "destructive",
-      });
-    }
-  };
-
   const handleTestAdAccount = async (id: string) => {
     try {
       setTestingAdAccount(id);
@@ -733,18 +682,11 @@ export default function SystemSettingsPage() {
 
       const data = await res.json();
 
-      if (data.success) {
-        toast({
-          title: "✅ ทดสอบสำเร็จ",
-          description: data.message,
-        });
-      } else {
-        toast({
-          title: "❌ ทดสอบไม่สำเร็จ",
-          description: data.message,
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: data.success ? "✅ ทดสอบสำเร็จ" : "❌ ทดสอบไม่สำเร็จ",
+        description: data.message,
+        variant: data.success ? "default" : "destructive",
+      });
 
       fetchAdAccounts();
     } catch (error) {
@@ -818,9 +760,7 @@ export default function SystemSettingsPage() {
     );
   }
 
-  if (!isAuthorized) {
-    return null;
-  }
+  if (!isAuthorized) return null;
 
   // ========== MAIN RENDER ==========
 
@@ -915,6 +855,7 @@ export default function SystemSettingsPage() {
                 LINE Integration
               </CardTitle>
             </CardHeader>
+
             <CardContent className="space-y-4">
               <div>
                 <Label>LINE Notify Token</Label>
@@ -923,10 +864,7 @@ export default function SystemSettingsPage() {
                     type={showTokens.notify ? "text" : "password"}
                     value={settings.lineNotifyToken}
                     onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        lineNotifyToken: e.target.value,
-                      })
+                      setSettings({ ...settings, lineNotifyToken: e.target.value })
                     }
                     placeholder="ใส่ token ใหม่เพื่ออัพเดท"
                   />
@@ -934,10 +872,7 @@ export default function SystemSettingsPage() {
                     variant="outline"
                     size="icon"
                     onClick={() =>
-                      setShowTokens({
-                        ...showTokens,
-                        notify: !showTokens.notify,
-                      })
+                      setShowTokens((p) => ({ ...p, notify: !p.notify }))
                     }
                   >
                     {showTokens.notify ? (
@@ -967,10 +902,10 @@ export default function SystemSettingsPage() {
                     variant="outline"
                     size="icon"
                     onClick={() =>
-                      setShowTokens({
-                        ...showTokens,
-                        channelAccess: !showTokens.channelAccess,
-                      })
+                      setShowTokens((p) => ({
+                        ...p,
+                        channelAccess: !p.channelAccess,
+                      }))
                     }
                   >
                     {showTokens.channelAccess ? (
@@ -1000,10 +935,10 @@ export default function SystemSettingsPage() {
                     variant="outline"
                     size="icon"
                     onClick={() =>
-                      setShowTokens({
-                        ...showTokens,
-                        channelSecret: !showTokens.channelSecret,
-                      })
+                      setShowTokens((p) => ({
+                        ...p,
+                        channelSecret: !p.channelSecret,
+                      }))
                     }
                   >
                     {showTokens.channelSecret ? (
@@ -1013,6 +948,21 @@ export default function SystemSettingsPage() {
                     )}
                   </Button>
                 </div>
+              </div>
+
+              {/* ✅ เพิ่มช่องกรอก Target ID (ของเดิมไม่มี UI ให้กรอก) */}
+              <div>
+                <Label>LINE Target ID (Group/User)</Label>
+                <Input
+                  value={settings.lineTargetId || ""}
+                  onChange={(e) =>
+                    setSettings({ ...settings, lineTargetId: e.target.value })
+                  }
+                  placeholder="เช่น groupId หรือ userId"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  ใส่ groupId / userId ที่ต้องการให้ระบบส่งแจ้งเตือนไป
+                </p>
               </div>
 
               <div>
@@ -1038,6 +988,7 @@ export default function SystemSettingsPage() {
                 ตั้งค่า LINE สำหรับรับ Facebook Ads Statements (PDF)
               </CardDescription>
             </CardHeader>
+
             <CardContent className="space-y-4">
               <Alert className="bg-purple-500/10 border-purple-500/30">
                 <Info className="w-4 h-4" />
@@ -1070,10 +1021,7 @@ export default function SystemSettingsPage() {
                     variant="outline"
                     size="icon"
                     onClick={() =>
-                      setShowAdsTokens({
-                        ...showAdsTokens,
-                        notify: !showAdsTokens.notify,
-                      })
+                      setShowAdsTokens((p) => ({ ...p, notify: !p.notify }))
                     }
                   >
                     {showAdsTokens.notify ? (
@@ -1103,10 +1051,10 @@ export default function SystemSettingsPage() {
                     variant="outline"
                     size="icon"
                     onClick={() =>
-                      setShowAdsTokens({
-                        ...showAdsTokens,
-                        channelAccess: !showAdsTokens.channelAccess,
-                      })
+                      setShowAdsTokens((p) => ({
+                        ...p,
+                        channelAccess: !p.channelAccess,
+                      }))
                     }
                   >
                     {showAdsTokens.channelAccess ? (
@@ -1136,10 +1084,10 @@ export default function SystemSettingsPage() {
                     variant="outline"
                     size="icon"
                     onClick={() =>
-                      setShowAdsTokens({
-                        ...showAdsTokens,
-                        channelSecret: !showAdsTokens.channelSecret,
-                      })
+                      setShowAdsTokens((p) => ({
+                        ...p,
+                        channelSecret: !p.channelSecret,
+                      }))
                     }
                   >
                     {showAdsTokens.channelSecret ? (
@@ -1165,15 +1113,9 @@ export default function SystemSettingsPage() {
                   <p className="font-semibold mb-2">📝 วิธีตั้งค่า LINE Ads Bot:</p>
                   <ol className="text-sm space-y-1 list-decimal list-inside">
                     <li>ไปที่ LINE Developers Console</li>
-                    <li>
-                      สร้าง Messaging API Channel (ชื่อ &quot;Ads Statement
-                      Bot&quot;)
-                    </li>
+                    <li>สร้าง Messaging API Channel (ชื่อ "Ads Statement Bot")</li>
                     <li>ตั้ง Webhook URL: {adsWebhookUrl}</li>
-                    <li>
-                      เปิด &quot;Use webhook&quot; และปิด &quot;Auto-reply
-                      messages&quot;
-                    </li>
+                    <li>เปิด "Use webhook" และปิด "Auto-reply messages"</li>
                     <li>Copy Tokens มาใส่ด้านบน</li>
                     <li>เพิ่ม Bot เข้ากลุ่ม LINE ใหม่</li>
                     <li>ส่งไฟล์ PDF สเตทเมนต์เพื่อทดสอบ</li>

@@ -8,17 +8,10 @@ export const runtime = "nodejs";
 
 // ---------------------- helpers ----------------------
 
-/**
- * Verify LINE webhook signature
- */
-function verifySignature(
-  body: string,
-  signature: string,
-  channelSecret: string
-): boolean {
+function verifySignature(body: string, signature: string, channelSecret: string): boolean {
   try {
     const hash = crypto
-      .createHmac("SHA256", channelSecret)
+      .createHmac("sha256", channelSecret)
       .update(body)
       .digest("base64");
     return hash === signature;
@@ -28,9 +21,6 @@ function verifySignature(
   }
 }
 
-/**
- * Reply text message to LINE
- */
 async function replyMessage(opts: {
   replyToken: string;
   channelAccessToken: string;
@@ -56,7 +46,6 @@ async function replyMessage(opts: {
       return false;
     }
 
-    console.log("✅ LINE reply sent");
     return true;
   } catch (error) {
     console.error("❌ LINE reply error:", error);
@@ -64,9 +53,6 @@ async function replyMessage(opts: {
   }
 }
 
-/**
- * LINE Notify
- */
 async function sendLineNotify(token: string, message: string): Promise<boolean> {
   try {
     const res = await fetch("https://notify-api.line.me/api/notify", {
@@ -83,7 +69,6 @@ async function sendLineNotify(token: string, message: string): Promise<boolean> 
       return false;
     }
 
-    console.log("✅ LINE Notify sent");
     return true;
   } catch (error) {
     console.error("❌ LINE Notify error:", error);
@@ -91,13 +76,10 @@ async function sendLineNotify(token: string, message: string): Promise<boolean> 
   }
 }
 
-/**
- * Download file (PDF) from LINE Messaging API
- */
 async function downloadLineFile(opts: {
   messageId: string;
   channelAccessToken: string;
-}): Promise<{ buffer: Buffer; fileName: string } | null> {
+}): Promise<Buffer | null> {
   const { messageId, channelAccessToken } = opts;
 
   try {
@@ -112,85 +94,50 @@ async function downloadLineFile(opts: {
     );
 
     if (!res.ok) {
-      console.error(
-        "❌ downloadLineFile failed:",
-        res.status,
-        await res.text()
-      );
+      console.error("❌ downloadLineFile failed:", res.status, await res.text());
       return null;
     }
 
-    const contentDisposition = res.headers.get("content-disposition");
-    const fileNameMatch = contentDisposition?.match(/filename="?(.+?)"?$/i);
-    const fileName =
-      fileNameMatch?.[1] ?? `statement-${messageId}.pdf`.replace(/"+/g, "");
-
     const arrayBuffer = await res.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    console.log(
-      `✅ Downloaded LINE file: ${fileName} (${buffer.length} bytes)`
-    );
-
-    return { buffer, fileName };
+    return Buffer.from(arrayBuffer);
   } catch (error) {
     console.error("❌ downloadLineFile error:", error);
     return null;
   }
 }
 
-// ---------------------- MAIN HANDLERS ----------------------
+// ---------------------- MAIN ----------------------
 
 export async function POST(request: NextRequest) {
   let rawBody = "";
 
   try {
     rawBody = await request.text();
-    const signature = request.headers.get("x-line-signature");
+    const signature = request.headers.get("x-line-signature") || "";
 
     console.log("===== LINE-ADS WEBHOOK POST =====");
     console.log("↪ rawBody length:", rawBody.length);
     console.log("↪ signature:", signature ? "present" : "missing");
 
     if (!signature) {
-      console.error("❌ Missing x-line-signature header");
-      return NextResponse.json(
-        { error: "Missing signature" },
-        { status: 401 }
-      );
+      console.warn("❌ Missing x-line-signature header");
+      return NextResponse.json({ ok: true }, { status: 200 });
     }
 
-    // โหลด Ads LINE settings จาก SystemSettings
     const settings = await prisma.systemSettings.findFirst({
-      where: {
-        adsLineChannelSecret: { not: null },
-      },
+      where: { adsLineChannelSecret: { not: null } },
+      orderBy: { updatedAt: "desc" as any },
     });
 
     if (!settings?.adsLineChannelSecret || !settings.adsLineChannelAccessToken) {
-      console.error(
-        "❌ LINE Ads settings not configured (adsLineChannelSecret / adsLineChannelAccessToken)"
-      );
-      // ต้องตอบ 200 กลับไป ไม่งั้น LINE จะ retry
-      return NextResponse.json(
-        { error: "LINE Ads not configured" },
-        { status: 200 }
-      );
+      console.error("❌ LINE Ads settings not configured");
+      return NextResponse.json({ ok: true }, { status: 200 });
     }
 
-    // Verify signature
-    const valid = verifySignature(
-      rawBody,
-      signature,
-      settings.adsLineChannelSecret
-    );
-
+    const valid = verifySignature(rawBody, signature, settings.adsLineChannelSecret);
     if (!valid) {
       console.error("❌ Invalid LINE Ads signature");
-      return NextResponse.json(
-        { error: "Invalid signature" },
-        { status: 401 }
-      );
+      return NextResponse.json({ ok: true }, { status: 200 });
     }
 
     const payload = JSON.parse(rawBody);
@@ -198,35 +145,24 @@ export async function POST(request: NextRequest) {
 
     console.log("↪ events count:", events.length);
 
-    if (events.length === 0) {
-      return NextResponse.json({ success: true });
-    }
-
     for (const event of events) {
       const eventType = event.type;
       const messageType = event.message?.type;
-      console.log(
-        `📨 Event: type=${eventType}, messageType=${messageType}, id=${event.message?.id}`
-      );
 
-      // --------------------------------------------------
       // 1) FILE MESSAGE = PDF STATEMENT
-      // --------------------------------------------------
       if (eventType === "message" && messageType === "file") {
         const messageId: string = event.message.id;
         const replyToken: string = event.replyToken;
-        const originalFileName: string =
-          event.message.fileName || "statement.pdf";
+        const originalFileName: string = event.message.fileName || "statement.pdf";
 
         console.log("📄 Handling statement file:", originalFileName);
 
-        // ดาวน์โหลดไฟล์ PDF จาก LINE
-        const fileData = await downloadLineFile({
+        const pdfBuf = await downloadLineFile({
           messageId,
           channelAccessToken: settings.adsLineChannelAccessToken,
         });
 
-        if (!fileData) {
+        if (!pdfBuf) {
           await replyMessage({
             replyToken,
             channelAccessToken: settings.adsLineChannelAccessToken,
@@ -235,14 +171,13 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // ประมวลผล PDF → ดึง period, amount, vat + fileHash
-        const statementMeta = await processStatementPDF(
-          fileData.buffer,
+        const meta = await processStatementPDF(
+          pdfBuf,
           originalFileName,
           settings.organizationId
         );
 
-        if (!statementMeta) {
+        if (!meta) {
           await replyMessage({
             replyToken,
             channelAccessToken: settings.adsLineChannelAccessToken,
@@ -253,28 +188,18 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // 🔁 เช็คว่าไฟล์นี้ (fileHash) เคยบันทึกแล้วหรือยัง
         const duplicate = await prisma.facebookAdsStatement.findFirst({
-          where: {
-            organizationId: settings.organizationId,
-            fileHash: statementMeta.fileHash,
-          },
+          where: { organizationId: settings.organizationId, fileHash: meta.fileHash },
         });
 
         if (duplicate) {
-          console.warn(
-            `⚠️ Duplicate statement from LINE. messageId=${messageId}, existingId=${duplicate.id}`
-          );
-
           await replyMessage({
             replyToken,
             channelAccessToken: settings.adsLineChannelAccessToken,
             text:
               "⚠️ ไฟล์สเตทเมนต์นี้ถูกบันทึกไว้แล้วในระบบ\n\n" +
               `รอบบิลเดิม: ${duplicate.period}\n` +
-              `ยอดเรียกเก็บ: ฿${duplicate.totalAmount.toLocaleString(
-                "th-TH"
-              )}`,
+              `ยอดเรียกเก็บ: ฿${duplicate.totalAmount.toLocaleString("th-TH")}`,
           });
 
           if (settings.adsLineNotifyToken) {
@@ -282,100 +207,66 @@ export async function POST(request: NextRequest) {
               settings.adsLineNotifyToken,
               `⚠️ มีการส่งสเตทเมนต์ซ้ำจาก LINE\n\n` +
                 `รอบบิล: ${duplicate.period}\n` +
-                `ยอดเรียกเก็บ: ฿${duplicate.totalAmount.toLocaleString(
-                  "th-TH"
-                )}`
+                `ยอดเรียกเก็บ: ฿${duplicate.totalAmount.toLocaleString("th-TH")}`
             );
           }
-
           continue;
         }
 
-        // บันทึกลงฐานข้อมูล
         try {
           const statement = await prisma.facebookAdsStatement.create({
             data: {
               organizationId: settings.organizationId,
-              period: statementMeta.period,
-              startDate: statementMeta.startDate,
-              endDate: statementMeta.endDate,
-              totalAmount: statementMeta.totalAmount,
-              vat: statementMeta.vat,
-              fileUrl: statementMeta.fileUrl,
-              fileName: statementMeta.fileName,
-              fileHash: statementMeta.fileHash,
+              period: meta.period,
+              startDate: meta.startDate,
+              endDate: meta.endDate,
+              totalAmount: meta.totalAmount,
+              vat: meta.vat,
+              fileUrl: meta.fileUrl,
+              fileName: meta.fileName,
+              fileHash: meta.fileHash,
               source: "LINE",
               lineMessageId: messageId,
               isProcessed: false,
             },
           });
 
-          console.log(
-            `✅ Saved FacebookAdsStatement: ${statement.id} / ${statement.period}`
-          );
-
-          // ตอบกลับในห้อง LINE
           await replyMessage({
             replyToken,
             channelAccessToken: settings.adsLineChannelAccessToken,
             text:
               "✅ รับสเตทเมนต์เรียบร้อยแล้ว!\n\n" +
               `รอบบิล: ${statement.period}\n` +
-              `ยอดเรียกเก็บ (รวม VAT): ฿${statement.totalAmount.toLocaleString(
-                "th-TH"
-              )}\n` +
+              `ยอดเรียกเก็บ (รวม VAT): ฿${statement.totalAmount.toLocaleString("th-TH")}\n` +
               `VAT: ฿${statement.vat.toLocaleString("th-TH")}\n\n` +
               `สามารถตรวจสอบได้ที่หน้า Facebook Ads Statements ในระบบเว็บ`,
           });
 
-          // ยิง LINE Notify ถ้ามี token
           if (settings.adsLineNotifyToken) {
             await sendLineNotify(
               settings.adsLineNotifyToken,
               `📄 รับสเตทเมนต์โฆษณาใหม่\n\n` +
                 `รอบบิล: ${statement.period}\n` +
-                `ยอดเรียกเก็บ: ฿${statement.totalAmount.toLocaleString(
-                  "th-TH"
-                )}\n` +
-                `VAT: ฿${statement.vat.toLocaleString("th-TH")}\n` +
-                `วันที่: ${new Date().toLocaleDateString("th-TH")}`
+                `ยอดเรียกเก็บ: ฿${statement.totalAmount.toLocaleString("th-TH")}\n` +
+                `VAT: ${statement.vat.toLocaleString("th-TH")}`
             );
           }
         } catch (err: any) {
           console.error("❌ Error saving FacebookAdsStatement:", err);
-
-          if (err?.code === "P2002") {
-            await replyMessage({
-              replyToken,
-              channelAccessToken: settings.adsLineChannelAccessToken,
-              text:
-                "⚠️ ไฟล์นี้เคยถูกบันทึกไว้แล้วในระบบ\n" +
-                "ไม่ต้องส่งซ้ำอีกนะคะ 🙂",
-            });
-          } else {
-            await replyMessage({
-              replyToken,
-              channelAccessToken: settings.adsLineChannelAccessToken,
-              text:
-                "❌ เกิดข้อผิดพลาดขณะบันทึกสเตทเมนต์ในระบบ\n" +
-                "โปรดลองใหม่อีกครั้ง หรือแจ้งผู้ดูแลระบบ",
-            });
-          }
+          await replyMessage({
+            replyToken,
+            channelAccessToken: settings.adsLineChannelAccessToken,
+            text: "❌ เกิดข้อผิดพลาดขณะบันทึกสเตทเมนต์ในระบบ",
+          });
         }
 
         continue;
       }
 
-      // --------------------------------------------------
-      // 2) TEXT MESSAGE = HELP / HOW-TO
-      // --------------------------------------------------
+      // 2) TEXT MESSAGE = HELP
       if (eventType === "message" && messageType === "text") {
         const text: string = event.message.text?.trim().toLowerCase() ?? "";
         const replyToken: string = event.replyToken;
-
-        if (!text) continue;
-
-        console.log("💬 LINE Ads text message:", text);
 
         if (
           text.includes("help") ||
@@ -388,36 +279,27 @@ export async function POST(request: NextRequest) {
             channelAccessToken: settings.adsLineChannelAccessToken,
             text:
               "📋 วิธีส่งสเตทเมนต์ค่าโฆษณา Meta Ads\n\n" +
-              "1. ดาวน์โหลดไฟล์สเตทเมนต์ (PDF) จาก Meta Business Suite\n" +
-              "2. ส่งไฟล์ PDF นี้เข้าห้องแชทที่เชื่อมกับบอท\n" +
-              "3. ระบบจะอ่านรอบบิล ยอดเรียกเก็บ และ VAT ให้อัตโนมัติ\n\n" +
-              "จากนั้นสามารถดูสรุปทั้งหมดได้ในหน้า \"Facebook Ads Statements\" บนเว็บ",
+              "1) ดาวน์โหลดไฟล์สเตทเมนต์ (PDF)\n" +
+              "2) ส่งไฟล์ PDF เข้าห้องนี้\n" +
+              "3) ระบบจะอ่านรอบบิล/ยอด/VAT อัตโนมัติ\n\n" +
+              "ดูผลได้ที่หน้า Facebook Ads Statements บนเว็บ",
           });
-        } else {
-          console.log("ℹ️ Non-help text – ignored");
         }
       }
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ ok: true }, { status: 200 });
   } catch (error: any) {
     console.error("❌ LINE Ads webhook error:", error);
-    console.error("rawBody:", rawBody.slice(0, 500)); // กัน log ยาวเกิน
-
-    // ต้องตอบ 200 ให้ LINE เสมอ ไม่งั้นจะ retry ถี่
-    return NextResponse.json(
-      { error: error?.message || "Webhook error" },
-      { status: 200 }
-    );
+    // ✅ ตอบ 200 เสมอ กัน retry
+    return NextResponse.json({ ok: true }, { status: 200 });
   }
 }
 
-// สำหรับทดสอบจาก browser / curl
-export async function GET(_request: NextRequest) {
+export async function GET() {
   return NextResponse.json({
     ok: true,
-    message: "LINE Ads TEST webhook ready",
-    endpoint: "/api/webhooks/line-ads",
+    message: "LINE Ads webhook ready",
     time: new Date().toISOString(),
   });
 }

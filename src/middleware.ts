@@ -2,50 +2,46 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-// เส้นทางที่ไม่ต้อง login
 const isPublicRoute = createRouteMatcher([
-  "/",
   "/sign-in(.*)",
   "/sign-up(.*)",
 
-  // webhooks
-  "/api/webhooks(.*)",
+  // ✅ public: ให้หน้า sign-in เรียก settings ได้โดยไม่โดน redirect ไป Clerk
+  "/api/system-settings(.*)",
+
+  // ✅ allow LINE webhooks
+  "/api/webhooks/line(.*)",
+  "/api/webhooks/(.*)",
+
   "/api/line/webhook(.*)",
+  "/api/line/(.*)",
 
-  // legacy / public api
-  "/api/daily-cutoff/auto(.*)",
-
-  // ✅ cron endpoint (ปล่อย public แล้วให้ route ตรวจ secret เอง)
-  "/api/cron/daily-summary(.*)",
+  "/api/health(.*)",
 ]);
 
-export default clerkMiddleware(async (auth, request) => {
-  const { userId } = await auth();
-  const pathname = request.nextUrl.pathname;
+export default clerkMiddleware(async (auth, req) => {
+  // Public routes ผ่านได้เลย
+  if (isPublicRoute(req)) return NextResponse.next();
 
-  const publicRoute = isPublicRoute(request);
-  const isApiPath = pathname.startsWith("/api");
+  const a = await auth();
 
-  // ถ้าล็อกอินแล้วและเข้า "/" ให้ไป dashboard
-  if (userId && pathname === "/") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
+  if (!a.userId) {
+    const returnBack = req.nextUrl.pathname + req.nextUrl.search;
 
-  // ไม่ล็อกอิน และไม่ใช่ public
-  if (!userId && !publicRoute) {
-    if (isApiPath) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // ใช้ของ Clerk ถ้ามี
+    if ("redirectToSignIn" in a && typeof a.redirectToSignIn === "function") {
+      return a.redirectToSignIn({ returnBackUrl: returnBack });
     }
-    // ✅ เปลี่ยนจาก "/" -> "/sign-in" ลดโอกาส loop/กระพิบ
-    return NextResponse.redirect(new URL("/sign-in", request.url));
+
+    // fallback ของเรา (ใช้ returnBack แบบ relative ไม่เอา req.url)
+    const signInUrl = new URL("/sign-in", req.nextUrl.origin);
+    signInUrl.searchParams.set("redirect_url", returnBack);
+    return NextResponse.redirect(signInUrl);
   }
 
   return NextResponse.next();
 });
 
 export const config = {
-  matcher: [
-    "/((?!_next|.*\\..*|favicon.ico).*)",
-    "/(api|trpc)(.*)",
-  ],
+  matcher: ["/((?!.*\\..*|_next).*)", "/", "/(api|trpc)(.*)"],
 };

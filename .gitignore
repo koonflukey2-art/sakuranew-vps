@@ -48,3 +48,9 @@ firestore-debug.log
 public/uploads/*
 !public/uploads/.gitkeep
 !public/uploads/receipts/.gitkeep
+# local junk
+nextn@*
+src/app/api/system-settings/route.ts.bad.*
+*.swp
+curl
+next

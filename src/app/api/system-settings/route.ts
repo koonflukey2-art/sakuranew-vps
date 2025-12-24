@@ -1,4 +1,4 @@
-// app/api/system-settings/route.ts
+// src/app/api/system-settings/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
@@ -6,205 +6,181 @@ import { getOrganizationId } from "@/lib/organization";
 
 export const runtime = "nodejs";
 
-// ใช้สำหรับ mask token ใน response (ไม่ให้ frontend เห็นเต็ม ๆ)
-function maskToken(token: string | null | undefined): string | null {
-  if (!token || token.length < 10) return null;
-  return `${token.substring(0, 4)}...${token.substring(token.length - 4)}`;
+type Payload = {
+  // cut-off
+  dailyCutOffHour?: number | null;
+  dailyCutOffMinute?: number | null;
+
+  // Stock LINE
+  lineNotifyToken?: string | null;
+  lineChannelAccessToken?: string | null;
+  lineChannelSecret?: string | null;
+  lineWebhookUrl?: string | null;
+  lineTargetId?: string | null;
+
+  // Ads LINE
+  adsLineNotifyToken?: string | null;
+  adsLineChannelAccessToken?: string | null;
+  adsLineChannelSecret?: string | null;
+  adsLineWebhookUrl?: string | null;
+
+  // notify/admin
+  adminEmails?: string | null;
+  notifyOnOrder?: boolean | null;
+  notifyOnLowStock?: boolean | null;
+  notifyDailySummary?: boolean | null;
+};
+
+// return: undefined = not provided, null = clear, string = set
+function pickOptionalString(v: unknown): string | null | undefined {
+  if (v === undefined) return undefined;
+  if (v === null) return null;
+  if (typeof v !== "string") return undefined;
+  const t = v.trim();
+  return t.length ? t : null;
 }
 
-// กันไม่ให้ค่าที่ถูก mask (เช่น "abcd...wxyz") ไปถูก save ทับของจริงใน DB
-function isMaskedValue(v: string): boolean {
-  return /^[A-Za-z0-9_-]{2,8}\.\.\.[A-Za-z0-9_-]{2,8}$/.test(v);
+function pickOptionalInt(v: unknown): number | null | undefined {
+  if (v === undefined) return undefined;
+  if (v === null) return null;
+  const n = typeof v === "number" ? v : Number(v);
+  if (!Number.isFinite(n)) return undefined;
+  return Math.trunc(n);
 }
 
-function toSafeSettings(settings: any) {
-  return {
-    ...settings,
-
-    // Stock LINE
-    lineNotifyToken: maskToken(settings.lineNotifyToken),
-    lineChannelAccessToken: maskToken(settings.lineChannelAccessToken),
-    lineChannelSecret: maskToken(settings.lineChannelSecret),
-
-    // Ads LINE
-    adsLineNotifyToken: maskToken(settings.adsLineNotifyToken),
-    adsLineChannelAccessToken: maskToken(settings.adsLineChannelAccessToken),
-    adsLineChannelSecret: maskToken(settings.adsLineChannelSecret),
-
-    dailySummaryLastSentAt: settings.dailySummaryLastSentAt,
-  };
+function pickOptionalBool(v: unknown): boolean | null | undefined {
+  if (v === undefined) return undefined;
+  if (v === null) return null;
+  if (typeof v === "boolean") return v;
+  return undefined;
 }
 
-function toInt(v: any, fallback: number) {
-  const n = parseInt(String(v), 10);
-  return Number.isFinite(n) ? n : fallback;
-}
-
-export async function GET(_request: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
     const user = await currentUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const orgId = await getOrganizationId();
-    if (!orgId) return NextResponse.json({ error: "No organization" }, { status: 400 });
+    if (!orgId) return NextResponse.json({ error: "No organization" }, { status: 403 });
 
-    let settings = await prisma.systemSettings.findUnique({
+    const settings = await prisma.systemSettings.findUnique({
       where: { organizationId: orgId },
+      select: {
+        organizationId: true,
+
+        dailyCutOffHour: true,
+        dailyCutOffMinute: true,
+
+        // Stock LINE
+        lineNotifyToken: true,
+        lineChannelAccessToken: true,
+        lineChannelSecret: true,
+        lineWebhookUrl: true,
+        lineTargetId: true,
+
+        // Ads LINE
+        adsLineNotifyToken: true,
+        adsLineChannelAccessToken: true,
+        adsLineChannelSecret: true,
+        adsLineWebhookUrl: true,
+
+        // admin/notify
+        adminEmails: true,
+        notifyOnOrder: true,
+        notifyOnLowStock: true,
+        notifyDailySummary: true,
+      },
     });
 
-    if (!settings) {
-      settings = await prisma.systemSettings.create({
-        data: {
-          organizationId: orgId,
-          dailyCutOffHour: 23,
-          dailyCutOffMinute: 59,
-          notifyOnOrder: true,
-          notifyOnLowStock: true,
-          notifyDailySummary: true,
-          dailySummaryLastSentAt: null,
-
-          // กัน null/undefined ให้ครบ (ถ้า schema มี fields)
-          lineWebhookUrl: null,
-          lineTargetId: null,
-
-          adsLineWebhookUrl: null,
-          adsLineNotifyToken: null,
-          adsLineChannelAccessToken: null,
-          adsLineChannelSecret: null,
-        } as any,
-      });
-    }
-
-    return NextResponse.json(toSafeSettings(settings));
+    return NextResponse.json(settings);
   } catch (error: any) {
-    console.error("GET system settings error:", error);
+    console.error("Error fetching system settings:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to fetch settings" },
+      { error: error?.message || "Failed to fetch settings" },
       { status: 500 }
     );
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
     const user = await currentUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    // ตรวจ role แอดมิน
-    const dbUser = await prisma.user.findUnique({
-      where: { clerkId: user.id },
-      select: { role: true },
-    });
-
-    if (!dbUser || dbUser.role !== "ADMIN") {
-      return NextResponse.json(
-        { error: "Only ADMIN can modify settings" },
-        { status: 403 }
-      );
-    }
-
     const orgId = await getOrganizationId();
-    if (!orgId) return NextResponse.json({ error: "No organization" }, { status: 400 });
+    if (!orgId) return NextResponse.json({ error: "No organization" }, { status: 403 });
 
-    const body = await request.json().catch(() => ({} as any));
+    const body = (await req.json().catch(() => ({}))) as Payload;
 
-    // ✅ reset daily summary sent flag
-    const wantsReset =
-      body?.action === "resetDailySummary" || body?.resetDailySummary === true;
+    // cut-off
+    const dailyCutOffHour = pickOptionalInt(body.dailyCutOffHour);
+    const dailyCutOffMinute = pickOptionalInt(body.dailyCutOffMinute);
 
-    if (wantsReset) {
-      const settings = await prisma.systemSettings.upsert({
-        where: { organizationId: orgId },
-        update: { dailySummaryLastSentAt: null },
-        create: {
-          organizationId: orgId,
-          dailyCutOffHour: 23,
-          dailyCutOffMinute: 59,
-          notifyOnOrder: true,
-          notifyOnLowStock: true,
-          notifyDailySummary: true,
-          dailySummaryLastSentAt: null,
-        },
-      });
+    // Stock LINE
+    const lineNotifyToken = pickOptionalString(body.lineNotifyToken);
+    const lineChannelAccessToken = pickOptionalString(body.lineChannelAccessToken);
+    const lineChannelSecret = pickOptionalString(body.lineChannelSecret);
+    const lineWebhookUrl = pickOptionalString(body.lineWebhookUrl);
+    const lineTargetId = pickOptionalString(body.lineTargetId);
 
-      return NextResponse.json({
-        ok: true,
-        action: "resetDailySummary",
-        settings: toSafeSettings(settings),
-      });
-    }
+    // Ads LINE
+    const adsLineNotifyToken = pickOptionalString(body.adsLineNotifyToken);
+    const adsLineChannelAccessToken = pickOptionalString(body.adsLineChannelAccessToken);
+    const adsLineChannelSecret = pickOptionalString(body.adsLineChannelSecret);
+    const adsLineWebhookUrl = pickOptionalString(body.adsLineWebhookUrl);
+
+    // admin/notify
+    const adminEmails = pickOptionalString(body.adminEmails);
+    const notifyOnOrder = pickOptionalBool(body.notifyOnOrder);
+    const notifyOnLowStock = pickOptionalBool(body.notifyOnLowStock);
+    const notifyDailySummary = pickOptionalBool(body.notifyDailySummary);
+
+    // ✅ IMPORTANT: อย่า overwrite token ถ้า client "ไม่ส่งมา"
+    const createData: any = {
+      organizationId: orgId,
+    };
 
     const updateData: any = {};
 
-    // Cut-off time
-    if (body.dailyCutOffHour !== undefined) updateData.dailyCutOffHour = toInt(body.dailyCutOffHour, 23);
-    if (body.dailyCutOffMinute !== undefined) updateData.dailyCutOffMinute = toInt(body.dailyCutOffMinute, 59);
+    // cut-off
+    if (dailyCutOffHour !== undefined) updateData.dailyCutOffHour = dailyCutOffHour;
+    if (dailyCutOffMinute !== undefined) updateData.dailyCutOffMinute = dailyCutOffMinute;
 
     // Stock LINE
-    if (body.lineWebhookUrl !== undefined) updateData.lineWebhookUrl = body.lineWebhookUrl;
+    if (lineNotifyToken !== undefined) updateData.lineNotifyToken = lineNotifyToken;
+    if (lineChannelAccessToken !== undefined)
+      updateData.lineChannelAccessToken = lineChannelAccessToken;
+    if (lineChannelSecret !== undefined) updateData.lineChannelSecret = lineChannelSecret;
+    if (lineWebhookUrl !== undefined) updateData.lineWebhookUrl = lineWebhookUrl;
+    if (lineTargetId !== undefined) updateData.lineTargetId = lineTargetId;
 
-    if (typeof body.lineNotifyToken === "string") {
-      const v = body.lineNotifyToken.trim();
-      if (v && !isMaskedValue(v)) updateData.lineNotifyToken = v;
-    }
-    if (typeof body.lineChannelAccessToken === "string") {
-      const v = body.lineChannelAccessToken.trim();
-      if (v && !isMaskedValue(v)) updateData.lineChannelAccessToken = v;
-    }
-    if (typeof body.lineChannelSecret === "string") {
-      const v = body.lineChannelSecret.trim();
-      if (v && !isMaskedValue(v)) updateData.lineChannelSecret = v;
-    }
+    // Ads LINE
+    if (adsLineNotifyToken !== undefined) updateData.adsLineNotifyToken = adsLineNotifyToken;
+    if (adsLineChannelAccessToken !== undefined)
+      updateData.adsLineChannelAccessToken = adsLineChannelAccessToken;
+    if (adsLineChannelSecret !== undefined) updateData.adsLineChannelSecret = adsLineChannelSecret;
+    if (adsLineWebhookUrl !== undefined) updateData.adsLineWebhookUrl = adsLineWebhookUrl;
 
-    if (typeof body.lineTargetId === "string") {
-      updateData.lineTargetId = body.lineTargetId.trim() || null;
-    }
+    // admin/notify
+    if (adminEmails !== undefined) updateData.adminEmails = adminEmails;
+    if (notifyOnOrder !== undefined) updateData.notifyOnOrder = notifyOnOrder;
+    if (notifyOnLowStock !== undefined) updateData.notifyOnLowStock = notifyOnLowStock;
+    if (notifyDailySummary !== undefined) updateData.notifyDailySummary = notifyDailySummary;
 
-    // Ads LINE (Separate) — กัน masked value ไม่ให้ไปทับของจริง
-    if (typeof body.adsLineNotifyToken === "string") {
-      const v = body.adsLineNotifyToken.trim();
-      if (v && !isMaskedValue(v)) updateData.adsLineNotifyToken = v;
-    }
-    if (typeof body.adsLineChannelAccessToken === "string") {
-      const v = body.adsLineChannelAccessToken.trim();
-      if (v && !isMaskedValue(v)) updateData.adsLineChannelAccessToken = v;
-    }
-    if (typeof body.adsLineChannelSecret === "string") {
-      const v = body.adsLineChannelSecret.trim();
-      if (v && !isMaskedValue(v)) updateData.adsLineChannelSecret = v;
-    }
-    if (body.adsLineWebhookUrl !== undefined) {
-      updateData.adsLineWebhookUrl = body.adsLineWebhookUrl;
-    }
+    // create: ใส่ค่าเริ่มต้นจาก updateData ด้วย
+    Object.assign(createData, updateData);
 
-    // Notification flags
-    if (body.notifyOnOrder !== undefined) updateData.notifyOnOrder = !!body.notifyOnOrder;
-    if (body.notifyOnLowStock !== undefined) updateData.notifyOnLowStock = !!body.notifyOnLowStock;
-    if (body.notifyDailySummary !== undefined) updateData.notifyDailySummary = !!body.notifyDailySummary;
-
-    // Admin emails
-    if (body.adminEmails !== undefined) updateData.adminEmails = body.adminEmails;
-
-    const settings = await prisma.systemSettings.upsert({
+    const saved = await prisma.systemSettings.upsert({
       where: { organizationId: orgId },
+      create: createData,
       update: updateData,
-      create: {
-        organizationId: orgId,
-        dailyCutOffHour: 23,
-        dailyCutOffMinute: 59,
-        notifyOnOrder: true,
-        notifyOnLowStock: true,
-        notifyDailySummary: true,
-        dailySummaryLastSentAt: null,
-        ...updateData,
-      },
     });
 
-    return NextResponse.json(toSafeSettings(settings));
+    return NextResponse.json(saved);
   } catch (error: any) {
-    console.error("POST system settings error:", error);
+    console.error("Error saving system settings:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to save settings" },
+      { error: error?.message || "Failed to save settings" },
       { status: 500 }
     );
   }
