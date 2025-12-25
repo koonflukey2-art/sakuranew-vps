@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { getOrganizationId } from "@/lib/organization";
+import { getCurrentUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
 // GET /api/kpi - Fetch KPIs
 export async function GET(request: NextRequest) {
   try {
-    const clerkUser = await currentUser();
-    if (!clerkUser) {
+    const user = await getCurrentUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -55,8 +55,8 @@ export async function GET(request: NextRequest) {
 // POST /api/kpi - Calculate and create daily KPI
 export async function POST(request: NextRequest) {
   try {
-    const clerkUser = await currentUser();
-    if (!clerkUser) {
+    const user = await getCurrentUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

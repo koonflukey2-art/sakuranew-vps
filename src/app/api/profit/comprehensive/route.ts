@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
 import { getOrganizationId } from "@/lib/organization";
 import { calculateComprehensiveProfit } from "@/lib/profit-calculator";
+import { getCurrentUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -15,7 +15,7 @@ export const runtime = "nodejs";
  */
 export async function GET(request: NextRequest) {
   try {
-    const user = await currentUser();
+    const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

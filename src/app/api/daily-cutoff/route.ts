@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
 import { getOrganizationId } from "@/lib/organization";
 import { prisma } from "@/lib/prisma";
 import { createDailySummaryForOrg } from "@/lib/dailyCutoff";
@@ -9,6 +8,7 @@ import {
   sendLineNotify,
   formatDailySummary,
 } from "@/lib/line-integration";
+import { getCurrentUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -25,7 +25,7 @@ function toThaiDateLabelBangkok(d: Date) {
 // 🔹 GET: ใช้โหลด summary ในหน้า /daily-summary
 export async function GET(req: NextRequest) {
   try {
-    const user = await currentUser();
+    const user = await getCurrentUser();
     if (!user) return new NextResponse("Unauthorized", { status: 401 });
 
     const organizationId = await getOrganizationId();
@@ -84,7 +84,7 @@ export async function GET(req: NextRequest) {
 // 🔹 POST: ปุ่ม "ตัดยอดทันที" ในหน้าเว็บ
 export async function POST(req: NextRequest) {
   try {
-    const user = await currentUser();
+    const user = await getCurrentUser();
     if (!user) return new NextResponse("Unauthorized", { status: 401 });
 
     const organizationId = await getOrganizationId();

@@ -1,8 +1,8 @@
 // src/app/api/users/route.ts
 import { NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { getUserRole } from "@/lib/rbac";
+import { getCurrentUser } from "@/lib/auth";
 
 /**
  * GET /api/users
@@ -10,8 +10,8 @@ import { getUserRole } from "@/lib/rbac";
  */
 export async function GET() {
   try {
-    const clerkUser = await currentUser();
-    if (!clerkUser) {
+    const user = await getCurrentUser();
+    if (!user) {
       return NextResponse.json(
         { error: "Unauthorized - No user found" },
         { status: 401 }
@@ -31,7 +31,6 @@ export async function GET() {
     const users = await prisma.user.findMany({
       select: {
         id: true,
-        clerkId: true,
         email: true,
         name: true,
         role: true,

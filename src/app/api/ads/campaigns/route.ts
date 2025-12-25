@@ -1,28 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth";
 
-async function getOrganizationId(): Promise<string> {
+async function getOrganizationId(): Promise<string | null> {
   // Get from session or default org - implement based on your auth setup
-  const user = await currentUser();
-  if (!user) throw new Error("Unauthorized");
+  const user = await getCurrentUser();
+  if (!user) return null;
 
-  const dbUser = await prisma.user.findUnique({
-    where: { clerkId: user.id },
-    select: { organizationId: true },
-  });
-
-  return dbUser?.organizationId || "default-org";
+  return user.organizationId;
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await currentUser();
+    const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const orgId = await getOrganizationId();
+    if (!orgId) {
+      return NextResponse.json({ error: "No organization" }, { status: 403 });
+    }
     const { searchParams } = new URL(request.url);
     const platform = searchParams.get("platform");
 
@@ -46,12 +44,15 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await currentUser();
+    const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const orgId = await getOrganizationId();
+    if (!orgId) {
+      return NextResponse.json({ error: "No organization" }, { status: 403 });
+    }
     const body = await request.json();
 
     const campaign = await prisma.adCampaign.create({

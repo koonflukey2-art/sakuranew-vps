@@ -1,12 +1,12 @@
 import { prisma } from "@/lib/db";
 
 export async function checkPermission(
-  clerkId: string,
+  userId: string,
   requiredRole: "ADMIN" | "STOCK" | "EMPLOYEE"
 ): Promise<boolean> {
   try {
     const user = await prisma.user.findUnique({
-      where: { clerkId },
+      where: { id: userId },
       select: { role: true },
     });
 

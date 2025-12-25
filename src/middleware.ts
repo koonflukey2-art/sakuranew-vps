@@ -1,41 +1,32 @@
-// src/middleware.ts
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
-const isPublicRoute = createRouteMatcher([
-  "/sign-in(.*)",
-  "/sign-up(.*)",
+const publicRoutes = [
+  "/login",
+  "/register",
+  "/sign-in",
+  "/sign-up",
+  "/api/auth",
+  "/api/register",
+  "/api/system-settings",
+  "/api/webhooks/line",
+  "/api/webhooks",
+  "/api/line/webhook",
+  "/api/line",
+  "/api/health",
+];
 
-  // ✅ public: ให้หน้า sign-in เรียก settings ได้โดยไม่โดน redirect ไป Clerk
-  "/api/system-settings(.*)",
+export default auth((req) => {
+  const { pathname, search } = req.nextUrl;
+  const isPublic = publicRoutes.some((route) =>
+    pathname === route || pathname.startsWith(`${route}/`)
+  );
 
-  // ✅ allow LINE webhooks
-  "/api/webhooks/line(.*)",
-  "/api/webhooks/(.*)",
+  if (isPublic) return NextResponse.next();
 
-  "/api/line/webhook(.*)",
-  "/api/line/(.*)",
-
-  "/api/health(.*)",
-]);
-
-export default clerkMiddleware(async (auth, req) => {
-  // Public routes ผ่านได้เลย
-  if (isPublicRoute(req)) return NextResponse.next();
-
-  const a = await auth();
-
-  if (!a.userId) {
-    const returnBack = req.nextUrl.pathname + req.nextUrl.search;
-
-    // ใช้ของ Clerk ถ้ามี
-    if ("redirectToSignIn" in a && typeof a.redirectToSignIn === "function") {
-      return a.redirectToSignIn({ returnBackUrl: returnBack });
-    }
-
-    // fallback ของเรา (ใช้ returnBack แบบ relative ไม่เอา req.url)
-    const signInUrl = new URL("/sign-in", req.nextUrl.origin);
-    signInUrl.searchParams.set("redirect_url", returnBack);
+  if (!req.auth?.user) {
+    const signInUrl = new URL("/login", req.nextUrl.origin);
+    signInUrl.searchParams.set("redirect_url", pathname + search);
     return NextResponse.redirect(signInUrl);
   }
 

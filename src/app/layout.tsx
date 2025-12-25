@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
-import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/contexts/theme-context";
+import { AppSessionProvider } from "@/components/session-provider";
 
 export const metadata: Metadata = {
   title: "Shearer (S1) Profit Pilot",
@@ -15,21 +15,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider
-      appearance={{
-        layout: {
-          unsafe_disableDevelopmentModeWarnings: true,
-        },
-      }}
-    >
-      <html lang="en" suppressHydrationWarning>
-        <body className="font-sans antialiased bg-slate-950">
+    <html lang="en" suppressHydrationWarning>
+      <body className="font-sans antialiased bg-slate-950">
+        <AppSessionProvider>
           <ThemeProvider>
             {children}
             <Toaster />
           </ThemeProvider>
-        </body>
-      </html>
-    </ClerkProvider>
+        </AppSessionProvider>
+      </body>
+    </html>
   );
 }

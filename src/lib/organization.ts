@@ -1,8 +1,8 @@
 // src/lib/organization.ts
 // ฟังก์ชันช่วยเหลือสำหรับจัดการ Organization
 
-import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth";
 
 /**
  * ดึง Organization ID ของ user ปัจจุบัน
@@ -10,23 +10,18 @@ import { prisma } from "@/lib/prisma";
  */
 export async function getOrganizationId(): Promise<string | null> {
   try {
-    const clerkUser = await currentUser();
-    if (!clerkUser) {
+    const user = await getCurrentUser();
+    if (!user) {
       console.warn("No authenticated user found");
       return null;
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { clerkId: clerkUser.id },
-      select: { organizationId: true },
-    });
-
-    if (!dbUser || !dbUser.organizationId) {
-      console.warn(`User ${clerkUser.id} has no organization`);
+    if (!user.organizationId) {
+      console.warn(`User ${user.id} has no organization`);
       return null;
     }
 
-    return dbUser.organizationId;
+    return user.organizationId;
   } catch (error) {
     console.error("Error getting organization ID:", error);
     return null;
@@ -38,11 +33,11 @@ export async function getOrganizationId(): Promise<string | null> {
  */
 export async function getOrganization() {
   try {
-    const clerkUser = await currentUser();
-    if (!clerkUser) return null;
+    const user = await getCurrentUser();
+    if (!user) return null;
 
     const dbUser = await prisma.user.findUnique({
-      where: { clerkId: clerkUser.id },
+      where: { id: user.id },
       include: { organization: true },
     });
 
@@ -139,6 +134,31 @@ export async function createOrganizationForUser(
     console.error("Error creating organization:", error);
     throw error;
   }
+}
+
+/**
+ * ทำให้ user มี organization เสมอ (ใช้สำหรับ backfill)
+ */
+export async function ensureOrganizationForUser(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { organizationId: true, email: true },
+  });
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  if (user.organizationId) {
+    return user.organizationId;
+  }
+
+  const org = await createOrganizationForUser(
+    userId,
+    user.email.split("@")[0] + "'s Company"
+  );
+
+  return org.id;
 }
 
 /**
