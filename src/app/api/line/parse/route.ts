@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getOrganizationId } from "@/lib/organization";
 import { parseLineMessage } from "@/lib/line-parser";
 
 export async function POST(request: Request) {
   try {
-    const clerkUser = await currentUser();
+    const clerkUser = await getCurrentUser();
     if (!clerkUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

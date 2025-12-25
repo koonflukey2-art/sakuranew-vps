@@ -1,88 +1,57 @@
-import { SignUp } from "@clerk/nextjs";
+import Link from "next/link";
 
 export default function SignUpPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 flex items-center justify-center px-4">
-      <div className="w-full max-w-xl mx-auto">
-        {/* Header ของเราเอง */}
-        <header className="text-center mb-8 space-y-1">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-pink-400 via-purple-400 to-blue-400 bg-clip-text text-transparent">
-            Sakura
-          </h1>
-          <p className="text-slate-400 text-sm tracking-wide">
-            สมัครสมาชิก Sakura
-          </p>
-        </header>
+    <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-100 p-6">
+      <div className="w-full max-w-md rounded-lg border border-slate-800 bg-slate-900/40 p-6">
+        <h1 className="text-xl font-semibold">Sign up</h1>
+        <p className="text-sm text-slate-300 mt-2">สร้างบัญชีภายในระบบ</p>
 
-        {/* การ์ด Sign Up */}
-        <section className="bg-slate-900/80 backdrop-blur-sm border border-slate-800 rounded-3xl shadow-2xl shadow-fuchsia-500/10 p-8">
-          <SignUp
-            appearance={{
-              layout: {
-                logoPlacement: "none",
-              },
-              elements: {
-                rootBox: "w-full",
-                card: "w-full bg-transparent shadow-none border-0 p-0",
+        <form className="mt-6 space-y-4" method="post" action="/api/auth/sign-up">
+          <div className="space-y-1">
+            <label className="text-sm text-slate-200" htmlFor="name">Name</label>
+            <input
+              id="name"
+              name="name"
+              type="text"
+              className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-slate-100"
+            />
+          </div>
 
-                // ซ่อน header เดิมของ Clerk
-                header: "hidden",
-                headerTitle: "hidden",
-                headerSubtitle: "hidden",
-                logoBox: "hidden",
+          <div className="space-y-1">
+            <label className="text-sm text-slate-200" htmlFor="email">Email</label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              required
+              className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-slate-100"
+            />
+          </div>
 
-                main: "mt-0",
-                form: "space-y-4",
+          <div className="space-y-1">
+            <label className="text-sm text-slate-200" htmlFor="password">Password</label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              required
+              className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-slate-100"
+            />
+          </div>
 
-                // ปุ่ม Social
-                socialButtonsBlockButton:
-                  "w-full bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-100",
-                socialButtonsBlockButtonText:
-                  "text-slate-100 font-medium text-sm",
+          <button
+            type="submit"
+            className="w-full rounded-md bg-slate-100 text-slate-950 px-3 py-2 font-medium"
+          >
+            Create account
+          </button>
+        </form>
 
-                // ปุ่มหลัก
-                formButtonPrimary:
-                  "w-full bg-violet-500 hover:bg-violet-600 text-white normal-case shadow-lg shadow-violet-500/30",
-
-                // ช่อง input
-                formFieldInput:
-                  "bg-slate-900 border border-slate-700 focus:border-violet-500 text-slate-100 placeholder:text-slate-500",
-                formFieldLabel: "text-slate-300 font-medium",
-
-                // Divider
-                dividerLine: "bg-slate-700",
-                dividerText: "text-slate-400 text-xs",
-
-                // OTP / code
-                otpCodeFieldInput:
-                  "border-slate-700 focus:border-violet-500 text-slate-100",
-
-                // ลิงก์ต่าง ๆ
-                formResendCodeLink:
-                  "text-violet-400 hover:text-violet-300 text-sm",
-                identityPreviewText: "text-slate-300",
-                identityPreviewEditButton:
-                  "text-violet-400 hover:text-violet-300 text-sm",
-                formFieldInputShowPasswordButton:
-                  "text-slate-400 hover:text-slate-200",
-
-                // ซ่อน footer เดิมของ Clerk
-                footer: "hidden",
-                footerAction: "hidden",
-                footerActionText: "hidden",
-              },
-            }}
-            routing="path"
-            path="/sign-up"
-            signInUrl="/sign-in"
-          />
-        </section>
-
-        {/* Footer ของเราเอง */}
-        <p className="text-center text-slate-500 mt-6 text-sm">
-          สมัครสมาชิกเพื่อเข้าใช้งานระบบจัดการร้านค้า Sakura E-Commerce
-        </p>
+        <div className="mt-4 text-sm text-slate-300">
+          มีบัญชีแล้ว? <Link className="underline" href="/sign-in">Sign in</Link>
+        </div>
       </div>
-    </main>
+    </div>
   );
 }

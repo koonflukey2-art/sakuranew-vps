@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getOrganizationId } from "@/lib/organization";
 import { checkPermission } from "@/lib/permissions";
@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 // GET /api/profit-targets - Fetch profit targets
 export async function GET(request: NextRequest) {
   try {
-    const clerkUser = await currentUser();
+    const clerkUser = await getCurrentUser();
     if (!clerkUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
 // POST /api/profit-targets - Create profit target (ADMIN only)
 export async function POST(request: NextRequest) {
   try {
-    const clerkUser = await currentUser();
+    const clerkUser = await getCurrentUser();
     if (!clerkUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
 // PUT /api/profit-targets - Update profit target (ADMIN only)
 export async function PUT(request: NextRequest) {
   try {
-    const clerkUser = await currentUser();
+    const clerkUser = await getCurrentUser();
     if (!clerkUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -183,7 +183,7 @@ export async function PUT(request: NextRequest) {
 // DELETE /api/profit-targets - Delete profit target (ADMIN only)
 export async function DELETE(request: NextRequest) {
   try {
-    const clerkUser = await currentUser();
+    const clerkUser = await getCurrentUser();
     if (!clerkUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useUser } from "@/lib/auth/compat-client";
 import { useToast } from "@/hooks/use-toast";
 
 export function WelcomeMessage() {

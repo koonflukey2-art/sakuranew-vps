@@ -1,13 +1,13 @@
 // src/app/api/capital-budget/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getOrganizationId } from "@/lib/organization";
 
 // GET /api/capital-budget  -> ดึงงบทั้งหมด (ไว้โชว์ในหน้า CapitalBudgetPage)
 export async function GET() {
   try {
-    const user = await currentUser();
+    const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -58,7 +58,7 @@ export async function GET() {
 // POST /api/capital-budget  -> ใช้ตอนกด "บันทึกงบประมาณ" จากหน้า CapitalBudgetPage
 export async function POST(request: NextRequest) {
   try {
-    const user = await currentUser();
+    const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

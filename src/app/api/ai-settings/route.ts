@@ -1,13 +1,13 @@
 // src/app/api/ai-settings/route.ts
 import { NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { encrypt, decrypt } from "@/lib/crypto";
 
 // GET - ดึง AI providers ทั้งหมด (ต่อ org)
 export async function GET() {
   try {
-    const clerk = await currentUser();
+    const clerk = await getCurrentUser();
     if (!clerk) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -49,7 +49,7 @@ export async function GET() {
 // POST - บันทึก/อัพเดท API Key (ต่อ org + provider)
 export async function POST(request: Request) {
   try {
-    const clerk = await currentUser();
+    const clerk = await getCurrentUser();
     if (!clerk) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -117,7 +117,7 @@ export async function POST(request: Request) {
 // PUT - ทดสอบ API Key ของ provider หนึ่งตัว (ยังเก็บไว้ เผื่อมีที่อื่นเรียก)
 export async function PUT(request: Request) {
   try {
-    const clerk = await currentUser();
+    const clerk = await getCurrentUser();
     if (!clerk) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db"; // ถ้าโปรเจกต์คุณใช้ "@/lib/prisma" ก็เปลี่ยนเป็นอันนั้นได้
 
 // GET /api/budgets
 export async function GET() {
   try {
-    const clerkUser = await currentUser();
+    const clerkUser = await getCurrentUser();
     if (!clerkUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -39,7 +39,7 @@ export async function GET() {
 // POST /api/budgets
 export async function POST(request: Request) {
   try {
-    const clerkUser = await currentUser();
+    const clerkUser = await getCurrentUser();
     if (!clerkUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
 // PUT /api/budgets
 export async function PUT(request: Request) {
   try {
-    const clerkUser = await currentUser();
+    const clerkUser = await getCurrentUser();
     if (!clerkUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -119,7 +119,7 @@ export async function PUT(request: Request) {
 // DELETE /api/budgets?id=...
 export async function DELETE(request: Request) {
   try {
-    const clerkUser = await currentUser();
+    const clerkUser = await getCurrentUser();
     if (!clerkUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

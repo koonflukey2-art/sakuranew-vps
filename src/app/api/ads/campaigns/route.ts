@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 async function getOrganizationId(): Promise<string> {
   // Get from session or default org - implement based on your auth setup
-  const user = await currentUser();
+  const user = await getCurrentUser();
   if (!user) throw new Error("Unauthorized");
 
   const dbUser = await prisma.user.findUnique({
@@ -17,7 +17,7 @@ async function getOrganizationId(): Promise<string> {
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await currentUser();
+    const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await currentUser();
+    const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

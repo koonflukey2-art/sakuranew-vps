@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useUser } from "@/lib/auth/compat-client";
 
 export function UserSync() {
   const { user, isLoaded } = useUser();

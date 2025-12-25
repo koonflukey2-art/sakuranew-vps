@@ -140,8 +140,8 @@ model User {
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   lastLogin DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   // Relations
   notifications        Notification[]
@@ -151,8 +151,11 @@ model User {
   facebookAdInsights   FacebookAdInsight[]
   aiProductSuggestions AIProductSuggestion[]
 
+  // ✅ sessions (เพิ่มใหม่) — NOTE: model ชื่อ session (lowercase)
+  sessions session[]
+
   // BudgetRequest เป็นฝั่ง requester
-  budgetRequests BudgetRequest[]  @relation("BudgetRequestRequester")
+  budgetRequests BudgetRequest[] @relation("BudgetRequestRequester")
   AutomationRule AutomationRule[]
   MetricsPlan    MetricsPlan[]
 
@@ -230,12 +233,12 @@ model ProductType {
 }
 
 model StockHistory {
-  id        String    @id @default(cuid())
+  id        String   @id @default(cuid())
   productId String
   type      StockType
   quantity  Int
   reason    String?
-  createdAt DateTime  @default(now())
+  createdAt DateTime @default(now())
   userId    String
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -674,12 +677,12 @@ model ChatSession {
 }
 
 model ChatMessage {
-  id        String      @id @default(cuid())
+  id        String   @id @default(cuid())
   sessionId String
   role      MessageRole
-  content   String      @db.Text
+  content   String   @db.Text
   metadata  Json?
-  createdAt DateTime    @default(now())
+  createdAt DateTime @default(now())
 
   session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
@@ -940,4 +943,25 @@ model SystemSettings {
   updatedAt DateTime @updatedAt
 
   @@index([organizationId])
+}
+
+// ============================
+// AUTH SESSIONS (เพิ่มใหม่)
+// ============================
+
+// IMPORTANT: model ชื่อ "session" เพื่อให้ Prisma Client เป็น prisma.session
+model session {
+  id              String   @id @default(cuid())
+  userId          String
+  sessionTokenHash String  @unique
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
 }

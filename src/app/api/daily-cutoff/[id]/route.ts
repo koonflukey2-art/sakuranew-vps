@@ -1,6 +1,6 @@
 // src/app/api/daily-cutoff/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
+import { getCurrentUser } from "@/lib/auth";
 import { getOrganizationId } from "@/lib/organization";
 import { prisma } from "@/lib/prisma";
 
@@ -11,7 +11,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const user = await currentUser();
+    const user = await getCurrentUser();
     if (!user) {
       return new NextResponse("Unauthorized", { status: 401 });
     }

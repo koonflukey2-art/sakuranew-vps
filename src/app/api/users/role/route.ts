@@ -1,6 +1,6 @@
 // src/app/api/users/role/route.ts
 import { NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getUserRole } from "@/lib/rbac";
 import type { UserRole } from "@/lib/rbac";
@@ -11,7 +11,7 @@ import type { UserRole } from "@/lib/rbac";
  */
 export async function PUT(request: Request) {
   try {
-    const clerkUser = await currentUser();
+    const clerkUser = await getCurrentUser();
     if (!clerkUser) {
       return NextResponse.json(
         { error: "Unauthorized - No user found" },

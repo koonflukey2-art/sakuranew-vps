@@ -1,12 +1,12 @@
 // src/app/api/ai-settings/test/route.ts
 import { NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { decrypt } from "@/lib/crypto";
 
 export async function POST(request: Request) {
   try {
-    const clerk = await currentUser();
+    const clerk = await getCurrentUser();
     if (!clerk) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }

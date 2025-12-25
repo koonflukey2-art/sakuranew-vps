@@ -2,7 +2,7 @@
 // ❗️ไฟล์นี้ใช้ฝั่ง Server เท่านั้น อย่านำไปใช้ใน Client Component
 // สำหรับฝั่ง client ให้ใช้: "@/lib/rbac-core"
 
-import { currentUser } from "@clerk/nextjs/server";
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -41,7 +41,7 @@ export interface RolePermissions {
  */
 export async function getUserRole(): Promise<UserRole> {
   try {
-    const clerkUser = await currentUser();
+    const clerkUser = await getCurrentUser();
     if (!clerkUser) {
       console.warn("No authenticated user found, defaulting to EMPLOYEE role");
       return "EMPLOYEE";
