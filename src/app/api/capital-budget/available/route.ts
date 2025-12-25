@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/db";
 import { getOrganizationId } from "@/lib/organization";
+import { getCurrentUser } from "@/lib/auth";
 
 /**
  * GET /api/capital-budget/available
@@ -9,12 +9,15 @@ import { getOrganizationId } from "@/lib/organization";
  */
 export async function GET(request: NextRequest) {
   try {
-    const user = await currentUser();
+    const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const orgId = await getOrganizationId();
+    if (!orgId) {
+      return NextResponse.json({ error: "No organization" }, { status: 403 });
+    }
 
     // Get all capital budgets for the organization
     const budgets = await prisma.capitalBudget.findMany({

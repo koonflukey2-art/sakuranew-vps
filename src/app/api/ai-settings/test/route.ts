@@ -1,22 +1,17 @@
 // src/app/api/ai-settings/test/route.ts
 import { NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/db";
 import { decrypt } from "@/lib/crypto";
+import { getCurrentUser } from "@/lib/auth";
 
 export async function POST(request: Request) {
   try {
-    const clerk = await currentUser();
-    if (!clerk) {
+    const user = await getCurrentUser();
+    if (!user) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { clerkId: clerk.id },
-      select: { organizationId: true },
-    });
-
-    if (!user || !user.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { success: false, message: "User or organization not found" },
         { status: 404 }

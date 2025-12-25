@@ -1,9 +1,9 @@
 // src/app/api/orders/route.ts
 import { NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { getOrganizationId } from "@/lib/organization";
 import { OrderStatus } from "@prisma/client";
+import { getCurrentUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -55,8 +55,8 @@ function uniqueUnknownPhone() {
 // ---------------------------
 export async function GET(request: Request) {
   try {
-    const clerkUser = await currentUser();
-    if (!clerkUser) {
+    const user = await getCurrentUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -119,8 +119,8 @@ export async function GET(request: Request) {
 // ---------------------------
 export async function POST(request: Request) {
   try {
-    const clerkUser = await currentUser();
-    if (!clerkUser) {
+    const user = await getCurrentUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -251,17 +251,11 @@ export async function POST(request: Request) {
 // ---------------------------
 export async function PUT(request: Request) {
   try {
-    const clerkUser = await currentUser();
-    if (!clerkUser) {
+    const user = await getCurrentUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
-    const dbUser = await prisma.user.findUnique({
-      where: { clerkId: clerkUser.id },
-      select: { role: true },
-    });
-
-    if (!dbUser || dbUser.role !== "ADMIN") {
+    if (user.role !== "ADMIN") {
       return NextResponse.json(
         { error: "Only ADMIN can edit orders" },
         { status: 403 }
@@ -338,17 +332,11 @@ export async function PUT(request: Request) {
 // ---------------------------
 export async function DELETE(request: Request) {
   try {
-    const clerkUser = await currentUser();
-    if (!clerkUser) {
+    const user = await getCurrentUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
-    const dbUser = await prisma.user.findUnique({
-      where: { clerkId: clerkUser.id },
-      select: { role: true },
-    });
-
-    if (!dbUser || dbUser.role !== "ADMIN") {
+    if (user.role !== "ADMIN") {
       return NextResponse.json(
         { error: "Only ADMIN can delete orders" },
         { status: 403 }

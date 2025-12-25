@@ -12,10 +12,10 @@ export async function GET() {
 
     return NextResponse.json({
       id: user.id,
-      clerkId: user.clerkId,
       email: user.email,
       name: user.name,
       role: user.role,
+      organizationId: user.organizationId,
     });
   } catch (error) {
     console.error("Error fetching current user:", error);

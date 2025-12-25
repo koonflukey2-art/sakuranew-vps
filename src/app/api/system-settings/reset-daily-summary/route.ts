@@ -1,8 +1,8 @@
 // src/app/api/system-settings/reset-daily-summary/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { getOrganizationId } from "@/lib/organization";
+import { getCurrentUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -22,18 +22,12 @@ export async function POST(_request: NextRequest) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const user = await currentUser();
+    const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // ตรวจ role แอดมิน
-    const dbUser = await prisma.user.findUnique({
-      where: { clerkId: user.id },
-      select: { role: true },
-    });
-
-    if (!dbUser || dbUser.role !== "ADMIN") {
+    if (user.role !== "ADMIN") {
       return NextResponse.json(
         { error: "Only ADMIN can reset daily summary" },
         { status: 403 }

@@ -2,8 +2,7 @@
 // ❗️ไฟล์นี้ใช้ฝั่ง Server เท่านั้น อย่านำไปใช้ใน Client Component
 // สำหรับฝั่ง client ให้ใช้: "@/lib/rbac-core"
 
-import { currentUser } from "@clerk/nextjs/server";
-import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth";
 
 /**
  * User Role Types
@@ -41,25 +40,13 @@ export interface RolePermissions {
  */
 export async function getUserRole(): Promise<UserRole> {
   try {
-    const clerkUser = await currentUser();
-    if (!clerkUser) {
+    const user = await getCurrentUser();
+    if (!user) {
       console.warn("No authenticated user found, defaulting to EMPLOYEE role");
       return "EMPLOYEE";
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { clerkId: clerkUser.id },
-      select: { role: true },
-    });
-
-    if (!dbUser) {
-      console.warn(
-        `User not found in database for clerkId: ${clerkUser.id}, defaulting to EMPLOYEE role`
-      );
-      return "EMPLOYEE";
-    }
-
-    return (dbUser.role as UserRole) || "EMPLOYEE";
+    return (user.role as UserRole) || "EMPLOYEE";
   } catch (error) {
     console.error("Error getting user role:", error);
     return "EMPLOYEE";

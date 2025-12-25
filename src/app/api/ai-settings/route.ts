@@ -1,34 +1,37 @@
 // src/app/api/ai-settings/route.ts
 import { NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/db";
 import { encrypt, decrypt } from "@/lib/crypto";
+import { getCurrentUser } from "@/lib/auth";
 
 // GET - ดึง AI providers ทั้งหมด (ต่อ org)
 export async function GET() {
   try {
-    const clerk = await currentUser();
-    if (!clerk) {
+    const user = await getCurrentUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { clerkId: clerk.id },
-      include: {
-        organization: {
-          include: { aiProviders: true },
-        },
-      },
-    });
-
-    if (!user || !user.organization) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "User or organization not found" },
         { status: 404 }
       );
     }
 
-    const providers = user.organization.aiProviders.map((p) => ({
+    const organization = await prisma.organization.findUnique({
+      where: { id: user.organizationId },
+      include: { aiProviders: true },
+    });
+
+    if (!organization) {
+      return NextResponse.json(
+        { error: "User or organization not found" },
+        { status: 404 }
+      );
+    }
+
+    const providers = organization.aiProviders.map((p) => ({
       id: p.id,
       provider: p.provider,
       modelName: p.modelName,
@@ -49,16 +52,12 @@ export async function GET() {
 // POST - บันทึก/อัพเดท API Key (ต่อ org + provider)
 export async function POST(request: Request) {
   try {
-    const clerk = await currentUser();
-    if (!clerk) {
+    const user = await getCurrentUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { clerkId: clerk.id },
-    });
-
-    if (!user || !user.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "User or organization not found" },
         { status: 404 }
@@ -117,8 +116,8 @@ export async function POST(request: Request) {
 // PUT - ทดสอบ API Key ของ provider หนึ่งตัว (ยังเก็บไว้ เผื่อมีที่อื่นเรียก)
 export async function PUT(request: Request) {
   try {
-    const clerk = await currentUser();
-    if (!clerk) {
+    const user = await getCurrentUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

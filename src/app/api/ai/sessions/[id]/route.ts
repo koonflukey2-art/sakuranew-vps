@@ -1,7 +1,7 @@
 // src/app/api/ai/sessions/[id]/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth"; // ถ้าใช้ชื่ออื่น เช่น getUserFromClerk ให้เปลี่ยนตรงนี้ให้ตรงกับโปรเจกต์จริง
+import { getCurrentUser } from "@/lib/auth";
 
 type RouteParams = {
   params: {

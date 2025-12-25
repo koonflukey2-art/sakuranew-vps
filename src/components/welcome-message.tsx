@@ -1,24 +1,24 @@
 "use client";
 
 import { useEffect } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useSession } from "next-auth/react";
 import { useToast } from "@/hooks/use-toast";
 
 export function WelcomeMessage() {
-  const { user, isLoaded } = useUser();
+  const { data: session, status } = useSession();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (isLoaded && user) {
+    if (status === "authenticated" && session?.user) {
       const hasShownWelcome = sessionStorage.getItem("hasShownWelcome");
 
       if (!hasShownWelcome) {
-        // Wait a bit for page to load
         setTimeout(() => {
           toast({
             title: "🎉 ยินดีต้อนรับเข้าสู่ระบบ",
-            description: `สวัสดี ${user.firstName || user.fullName || ""}! ยินดีต้อนรับกลับมา`,
-            className: "bg-gradient-to-br from-gray-900 to-black border-green-500/50 text-white shadow-xl",
+            description: `สวัสดี ${session.user.name || ""}! ยินดีต้อนรับกลับมา`,
+            className:
+              "bg-gradient-to-br from-gray-900 to-black border-green-500/50 text-white shadow-xl",
             duration: 4000,
           });
 
@@ -26,7 +26,7 @@ export function WelcomeMessage() {
         }, 500);
       }
     }
-  }, [isLoaded, user, toast]);
+  }, [session, status, toast]);
 
   return null;
 }

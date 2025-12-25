@@ -1,6 +1,6 @@
 "use client";
 
-import { useUser, useClerk } from "@clerk/nextjs";
+import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -24,8 +24,7 @@ interface UserData {
 }
 
 export function AccountMenu() {
-  const { user } = useUser();
-  const { signOut } = useClerk();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -47,10 +46,10 @@ export function AccountMenu() {
       }
     };
 
-    if (user) {
+    if (status === "authenticated") {
       fetchUserData();
     }
-  }, [user]);
+  }, [status]);
 
   // Load persisted expanded state
   useEffect(() => {
@@ -64,7 +63,7 @@ export function AccountMenu() {
     setIsLoggingOut(true);
 
     try {
-      await signOut();
+      await signOut({ redirect: false });
 
       // Show beautiful logout notification
       toast({
@@ -85,9 +84,15 @@ export function AccountMenu() {
     }
   };
 
-  if (!user) return null;
+  if (status !== "authenticated" || !session?.user) return null;
 
-  const userInitials = user.firstName?.[0] + (user.lastName?.[0] || "") || "U";
+  const userName = session.user.name || "User";
+  const userInitials =
+    userName
+      .split(" ")
+      .map((part) => part[0])
+      .slice(0, 2)
+      .join("") || "U";
 
   // Role display mapping
   const roleDisplay: Record<string, { label: string; color: string }> = {
@@ -138,12 +143,8 @@ export function AccountMenu() {
           {isExpanded && (
             <>
               <div className="text-right">
-                <p className="text-sm font-medium text-white">
-                  {user?.fullName || user?.firstName || "User"}
-                </p>
-                <p className="text-xs text-gray-400">
-                  {user?.primaryEmailAddress?.emailAddress}
-                </p>
+                <p className="text-sm font-medium text-white">{userName}</p>
+                <p className="text-xs text-gray-400">{session.user.email}</p>
                 {roleInfo && (
                   <Badge className={`text-xs mt-1 ${roleInfo.color}`}>
                     {roleInfo.label}
@@ -155,7 +156,10 @@ export function AccountMenu() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="rounded-full">
                     <Avatar className="w-11 h-11 border-2 border-purple-500 shadow-lg shadow-purple-500/20">
-                      <AvatarImage src={user.imageUrl} alt={user.fullName || "User"} />
+                      <AvatarImage
+                        src={session.user.image || ""}
+                        alt={userName}
+                      />
                       <AvatarFallback className="bg-gradient-to-br from-purple-600 to-pink-600 text-white font-bold">
                         {userInitials}
                       </AvatarFallback>
@@ -169,10 +173,10 @@ export function AccountMenu() {
                   <DropdownMenuLabel className="text-gray-300">
                     <div className="flex flex-col space-y-2">
                       <p className="text-base font-semibold text-white">
-                        {user.fullName || user.firstName || "User"}
+                        {userName}
                       </p>
                       <p className="text-xs text-gray-400 font-normal">
-                        {user.primaryEmailAddress?.emailAddress}
+                        {session.user.email}
                       </p>
                       {roleInfo && (
                         <Badge className={`text-xs ${roleInfo.color} w-fit`}>

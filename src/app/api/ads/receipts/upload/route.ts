@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 import { writeFile, mkdir } from "fs/promises";
@@ -208,18 +208,13 @@ async function extractAmountFromReceipt(
 // --------------------- main handler ---------------------
 export async function POST(request: NextRequest) {
   try {
-    const clerkUser = await currentUser();
-    if (!clerkUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const dbUser = await prisma.user.findUnique({
-      where: { clerkId: clerkUser.id },
-      select: { organizationId: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json({ error: "Organization not found for this user" }, { status: 404 });
     }
-    const orgId = dbUser.organizationId;
+    const orgId = user.organizationId;
 
     const formData = await request.formData();
     const file = formData.get("receipt") as File | null;

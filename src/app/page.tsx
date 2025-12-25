@@ -1,9 +1,7 @@
 import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
 
-export default function RootPage() {
-  // Simple redirect to sign-in
-  // Middleware will handle the rest:
-  // - If user is logged in, middleware redirects to /dashboard
-  // - If user is not logged in, they see /sign-in
-  redirect("/sign-in");
+export default async function RootPage() {
+  const session = await auth();
+  redirect(session?.user ? "/dashboard" : "/login");
 }

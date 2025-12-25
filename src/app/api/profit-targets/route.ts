@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { getOrganizationId } from "@/lib/organization";
 import { checkPermission } from "@/lib/permissions";
+import { getCurrentUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
 // GET /api/profit-targets - Fetch profit targets
 export async function GET(request: NextRequest) {
   try {
-    const clerkUser = await currentUser();
-    if (!clerkUser) {
+    const user = await getCurrentUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -51,13 +51,13 @@ export async function GET(request: NextRequest) {
 // POST /api/profit-targets - Create profit target (ADMIN only)
 export async function POST(request: NextRequest) {
   try {
-    const clerkUser = await currentUser();
-    if (!clerkUser) {
+    const user = await getCurrentUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Check ADMIN permission
-    const hasPermission = await checkPermission(clerkUser.id, "ADMIN");
+    const hasPermission = await checkPermission(user.id, "ADMIN");
     if (!hasPermission) {
       return NextResponse.json(
         { error: "Only ADMIN can create profit targets" },
@@ -126,12 +126,12 @@ export async function POST(request: NextRequest) {
 // PUT /api/profit-targets - Update profit target (ADMIN only)
 export async function PUT(request: NextRequest) {
   try {
-    const clerkUser = await currentUser();
-    if (!clerkUser) {
+    const user = await getCurrentUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const hasPermission = await checkPermission(clerkUser.id, "ADMIN");
+    const hasPermission = await checkPermission(user.id, "ADMIN");
     if (!hasPermission) {
       return NextResponse.json(
         { error: "Only ADMIN can update profit targets" },
@@ -183,12 +183,12 @@ export async function PUT(request: NextRequest) {
 // DELETE /api/profit-targets - Delete profit target (ADMIN only)
 export async function DELETE(request: NextRequest) {
   try {
-    const clerkUser = await currentUser();
-    if (!clerkUser) {
+    const user = await getCurrentUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const hasPermission = await checkPermission(clerkUser.id, "ADMIN");
+    const hasPermission = await checkPermission(user.id, "ADMIN");
     if (!hasPermission) {
       return NextResponse.json(
         { error: "Only ADMIN can delete profit targets" },

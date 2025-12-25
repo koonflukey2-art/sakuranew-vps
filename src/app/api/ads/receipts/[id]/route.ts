@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { join } from "path";
 import { unlink } from "fs/promises";
 import { existsSync } from "fs";
+import { getCurrentUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -16,19 +16,15 @@ export async function DELETE(
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await currentUser();
+    const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const dbUser = await prisma.user.findUnique({
-      where: { clerkId: user.id },
-      select: { organizationId: true },
-    });
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json({ error: "Organization not found" }, { status: 404 });
     }
 
     const { id } = await ctx.params;
-    const orgId = dbUser.organizationId;
+    const orgId = user.organizationId;
 
     const receipt = await prisma.adReceipt.findFirst({
       where: { id, organizationId: orgId },

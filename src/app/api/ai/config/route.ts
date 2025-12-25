@@ -1,27 +1,22 @@
 import { NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/db";
 import { encrypt, decrypt } from "@/lib/crypto";
+import { getCurrentUser } from "@/lib/auth";
 
 // GET - ดึง AI configs ทั้งหมด
 export async function GET() {
   try {
-    const clerkUser = await currentUser();
-    if (!clerkUser) {
+    const user = await getCurrentUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { clerkId: clerkUser.id },
-      include: { aiConfigs: true },
+    const aiConfigs = await prisma.aiConfig.findMany({
+      where: { userId: user.id },
     });
 
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
     // ไม่ส่ง API key กลับไป แค่บอกว่ามีหรือไม่
-    const configs = user.aiConfigs.map((config) => ({
+    const configs = aiConfigs.map((config) => ({
       id: config.id,
       provider: config.provider,
       isActive: config.isActive,
@@ -40,17 +35,9 @@ export async function GET() {
 // POST - เพิ่ม/อัพเดท AI config
 export async function POST(request: Request) {
   try {
-    const clerkUser = await currentUser();
-    if (!clerkUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { clerkId: clerkUser.id },
-    });
-
+    const user = await getCurrentUser();
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
@@ -94,17 +81,9 @@ export async function POST(request: Request) {
 // PUT - ทดสอบ API key
 export async function PUT(request: Request) {
   try {
-    const clerkUser = await currentUser();
-    if (!clerkUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { clerkId: clerkUser.id },
-    });
-
+    const user = await getCurrentUser();
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
